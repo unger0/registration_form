@@ -26,7 +26,7 @@ class CadastroApp extends StatelessWidget {
   }
 }
 
-// Tela principal do cadastro.
+// Tela principal de cadastro.
 class CadastroPage extends StatefulWidget {
   const CadastroPage({super.key});
 
@@ -35,7 +35,7 @@ class CadastroPage extends StatefulWidget {
 }
 
 class _CadastroPageState extends State<CadastroPage> {
-  // Chave responsável por identificar e validar o formulário.
+  // Chave utilizada para validar o formulário.
   final _formKey = GlobalKey<FormState>();
 
   // Controladores dos campos.
@@ -45,7 +45,13 @@ class _CadastroPageState extends State<CadastroPage> {
   final _telefoneController = TextEditingController();
   final _senhaController = TextEditingController();
 
-  // Libera os controladores quando a tela é descartada.
+  // NOVO: controlador da confirmação da senha.
+  final _confirmarSenhaController = TextEditingController();
+
+  // NOVO: estados que controlam a visibilidade das senhas.
+  bool _mostrarSenha = false;
+  bool _mostrarConfirmacao = false;
+
   @override
   void dispose() {
     _nomeController.dispose();
@@ -53,23 +59,21 @@ class _CadastroPageState extends State<CadastroPage> {
     _cpfController.dispose();
     _telefoneController.dispose();
     _senhaController.dispose();
+    _confirmarSenhaController.dispose();
     super.dispose();
   }
 
-  // NOVO: valida o formulário ao pressionar CADASTRAR.
+  // Valida todos os campos do formulário.
   void _cadastrar() {
-    // Fecha o teclado virtual.
     FocusScope.of(context).unfocus();
 
-    // Executa todos os validadores dos campos.
     final formularioValido = _formKey.currentState!.validate();
 
-    // Remove mensagens anteriores.
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
 
     if (formularioValido) {
-      // Todos os campos foram validados.
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text(
             'Cadastro realizado com sucesso!',
@@ -79,8 +83,7 @@ class _CadastroPageState extends State<CadastroPage> {
         ),
       );
     } else {
-      // Um ou mais campos estão inválidos.
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text(
             'Verifique os campos destacados em vermelho.',
@@ -151,8 +154,6 @@ class _CadastroPageState extends State<CadastroPage> {
                   prefixIcon: Icon(Icons.person_outline),
                   border: OutlineInputBorder(),
                 ),
-
-                // NOVO: valida o nome.
                 validator: (valor) {
                   if (valor == null || valor.trim().isEmpty) {
                     return 'O nome completo é obrigatório';
@@ -176,14 +177,20 @@ class _CadastroPageState extends State<CadastroPage> {
                   border: OutlineInputBorder(),
                 ),
 
-                // NOVO: valida o e-mail.
+                // NOVO: validação com expressão regular.
                 validator: (valor) {
-                  if (valor == null || valor.trim().isEmpty) {
+                  final email = valor?.trim() ?? '';
+
+                  if (email.isEmpty) {
                     return 'O e-mail é obrigatório';
                   }
 
-                  if (!valor.trim().contains('@')) {
-                    return 'O e-mail deve conter @';
+                  final regexEmail = RegExp(
+                    r'^[^\s@]+@[^\s@.]+(?:\.[^\s@.]+)+$',
+                  );
+
+                  if (!regexEmail.hasMatch(email)) {
+                    return 'Informe um e-mail válido';
                   }
 
                   return null;
@@ -206,8 +213,6 @@ class _CadastroPageState extends State<CadastroPage> {
                   prefixIcon: Icon(Icons.badge_outlined),
                   border: OutlineInputBorder(),
                 ),
-
-                // NOVO: verifica se o CPF foi informado.
                 validator: (valor) {
                   if (valor == null || valor.isEmpty) {
                     return 'O CPF é obrigatório';
@@ -233,8 +238,6 @@ class _CadastroPageState extends State<CadastroPage> {
                   prefixIcon: Icon(Icons.phone_outlined),
                   border: OutlineInputBorder(),
                 ),
-
-                // NOVO: verifica se o telefone foi informado.
                 validator: (valor) {
                   if (valor == null || valor.isEmpty) {
                     return 'O telefone é obrigatório';
@@ -250,16 +253,33 @@ class _CadastroPageState extends State<CadastroPage> {
               TextFormField(
                 controller: _senhaController,
                 keyboardType: TextInputType.visiblePassword,
-                textInputAction: TextInputAction.done,
-                obscureText: true,
-                decoration: const InputDecoration(
+                textInputAction: TextInputAction.next,
+                obscureText: !_mostrarSenha,
+                enableSuggestions: false,
+                autocorrect: false,
+                decoration: InputDecoration(
                   labelText: 'Senha',
-                  hintText: 'Digite sua senha',
-                  prefixIcon: Icon(Icons.lock_outline),
-                  border: OutlineInputBorder(),
-                ),
+                  hintText: 'Mínimo de 6 caracteres',
+                  prefixIcon: const Icon(Icons.lock_outline),
+                  border: const OutlineInputBorder(),
 
-                // NOVO: valida o tamanho da senha.
+                  // NOVO: botão de visibilidade da senha.
+                  suffixIcon: IconButton(
+                    tooltip: _mostrarSenha
+                        ? 'Ocultar senha'
+                        : 'Mostrar senha',
+                    icon: Icon(
+                      _mostrarSenha
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _mostrarSenha = !_mostrarSenha;
+                      });
+                    },
+                  ),
+                ),
                 validator: (valor) {
                   if (valor == null || valor.isEmpty) {
                     return 'A senha é obrigatória';
@@ -273,11 +293,59 @@ class _CadastroPageState extends State<CadastroPage> {
                 },
               ),
 
+              const SizedBox(height: 16),
+
+              // CAMPO 6 - CONFIRMAR SENHA
+              // NOVO: campo adicional do desafio extra.
+              TextFormField(
+                controller: _confirmarSenhaController,
+                keyboardType: TextInputType.visiblePassword,
+                textInputAction: TextInputAction.done,
+                obscureText: !_mostrarConfirmacao,
+                enableSuggestions: false,
+                autocorrect: false,
+                decoration: InputDecoration(
+                  labelText: 'Confirmar senha',
+                  hintText: 'Digite sua senha novamente',
+                  prefixIcon: const Icon(Icons.lock_reset),
+                  border: const OutlineInputBorder(),
+
+                  // NOVO: botão de visibilidade da confirmação.
+                  suffixIcon: IconButton(
+                    tooltip: _mostrarConfirmacao
+                        ? 'Ocultar confirmação'
+                        : 'Mostrar confirmação',
+                    icon: Icon(
+                      _mostrarConfirmacao
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _mostrarConfirmacao = !_mostrarConfirmacao;
+                      });
+                    },
+                  ),
+                ),
+
+                // NOVO: compara a confirmação com a senha.
+                validator: (valor) {
+                  if (valor == null || valor.isEmpty) {
+                    return 'Confirme sua senha';
+                  }
+
+                  if (valor != _senhaController.text) {
+                    return 'As senhas não coincidem';
+                  }
+
+                  return null;
+                },
+              ),
+
               const SizedBox(height: 24),
 
               // BOTÃO CADASTRAR
               ElevatedButton(
-                // NOVO: executa a validação do formulário.
                 onPressed: _cadastrar,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.indigo,
